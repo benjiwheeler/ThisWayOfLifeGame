@@ -1,5 +1,8 @@
 // This Way of Life Will Last Forever - Classic Mac Game
 // By Claude Code
+// Version 1.3
+
+const VERSION = '1.3';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -329,7 +332,57 @@ function drawObstacle(obstacle) {
     drawSprite(obstacle.type.sprite, obstacle.x, obstacle.y);
 }
 
-// Check collision
+// Check if a specific pixel in a sprite is solid (black)
+function isPixelSolid(sprite, pixelX, pixelY, scale = 2) {
+    const spriteRow = Math.floor(pixelY / scale);
+    const spriteCol = Math.floor(pixelX / scale);
+
+    if (spriteRow < 0 || spriteRow >= sprite.length) return false;
+    if (spriteCol < 0 || spriteCol >= sprite[0].length) return false;
+
+    return sprite[spriteRow][spriteCol] === 1;
+}
+
+// Pixel-perfect collision detection between two objects with sprites
+function checkPixelCollision(obj1, obj2, scale1 = 2, scale2 = 2) {
+    // First do bounding box check for performance
+    if (obj1.x >= obj2.x + obj2.width ||
+        obj1.x + obj1.width <= obj2.x ||
+        obj1.y >= obj2.y + obj2.height ||
+        obj1.y + obj1.height <= obj2.y) {
+        return false;
+    }
+
+    // Find overlap rectangle
+    const overlapLeft = Math.max(obj1.x, obj2.x);
+    const overlapRight = Math.min(obj1.x + obj1.width, obj2.x + obj2.width);
+    const overlapTop = Math.max(obj1.y, obj2.y);
+    const overlapBottom = Math.min(obj1.y + obj1.height, obj2.y + obj2.height);
+
+    // Check pixels in overlap area (sample every 2 pixels for performance)
+    for (let y = overlapTop; y < overlapBottom; y += 2) {
+        for (let x = overlapLeft; x < overlapRight; x += 2) {
+            // Convert to local coordinates for each sprite
+            const local1X = x - obj1.x;
+            const local1Y = y - obj1.y;
+            const local2X = x - obj2.x;
+            const local2Y = y - obj2.y;
+
+            // Check if both sprites have solid pixels at this position
+            const sprite1 = obj1.type ? obj1.type.sprite : sprites.woman;
+            const sprite2 = obj2.type ? obj2.type.sprite : sprites.woman;
+
+            if (isPixelSolid(sprite1, local1X, local1Y, scale1) &&
+                isPixelSolid(sprite2, local2X, local2Y, scale2)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+// Simple bounding box collision (for umbrella and non-critical checks)
 function checkCollision(rect1, rect2) {
     return rect1.x < rect2.x + rect2.width &&
            rect1.x + rect1.width > rect2.x &&
@@ -337,35 +390,89 @@ function checkCollision(rect1, rect2) {
            rect1.y + rect1.height > rect2.y;
 }
 
-// Check if obstacle would collide with any grounded obstacles
-function checkGroundObstacleCollision(obstacle) {
-    if (obstacle.deflected) return null; // Deflected obstacles pass through
-
-    for (let pile of groundPiles) {
-        for (let groundObstacle of pile.obstacles) {
-            if (checkCollision(obstacle, groundObstacle)) {
-                return groundObstacle;
+// Find the lowest solid pixel Y position in a sprite
+function getLowestSolidPixelY(sprite, scale = 2) {
+    for (let row = sprite.length - 1; row >= 0; row--) {
+        for (let col = 0; col < sprite[0].length; col++) {
+            if (sprite[row][col] === 1) {
+                return (row + 1) * scale; // Return bottom edge of this pixel
             }
         }
     }
-    return null;
+    return 0;
 }
 
-// Find the highest obstacle at a given x position
-function getHighestObstacleAt(x, width) {
-    let highest = GROUND_LEVEL;
+// Find the highest solid pixel Y position in a sprite
+function getHighestSolidPixelY(sprite, scale = 2) {
+    for (let row = 0; row < sprite.length; row++) {
+        for (let col = 0; col < sprite[0].length; col++) {
+            if (sprite[row][col] === 1) {
+                return row * scale; // Return top edge of this pixel
+            }
+        }
+    }
+    return 0;
+}
 
+// Find what Y position an obstacle should rest at given its X position
+// This scans pixel-by-pixel to find exact contact point
+function findRestingY(obstacle) {
+    if (obstacle.deflected) return null; // Deflected obstacles don't stack
+
+    let lowestRestY = GROUND_LEVEL;
+
+    // Check all grounded obstacles
     for (let pile of groundPiles) {
         for (let groundObstacle of pile.obstacles) {
-            // Check if x ranges overlap
-            if (x < groundObstacle.x + groundObstacle.width &&
-                x + width > groundObstacle.x) {
-                highest = Math.min(highest, groundObstacle.y);
+            // Quick bounding box check first
+            const xOverlap = obstacle.x < groundObstacle.x + groundObstacle.width &&
+                           obstacle.x + obstacle.width > groundObstacle.x;
+
+            if (!xOverlap) continue;
+
+            // Find where pixels would actually touch
+            // We need to scan each X column to find the highest contact point
+            const overlapLeft = Math.max(obstacle.x, groundObstacle.x);
+            const overlapRight = Math.min(obstacle.x + obstacle.width, groundObstacle.x + groundObstacle.width);
+
+            for (let worldX = overlapLeft; worldX < overlapRight; worldX += 2) {
+                const localX1 = worldX - obstacle.x;
+                const localX2 = worldX - groundObstacle.x;
+
+                // Find the lowest solid pixel in this column of the falling obstacle
+                let fallingBottomY = -1;
+                for (let localY = obstacle.height - 1; localY >= 0; localY--) {
+                    if (isPixelSolid(obstacle.type.sprite, localX1, localY, 2)) {
+                        fallingBottomY = localY;
+                        break;
+                    }
+                }
+
+                if (fallingBottomY === -1) continue; // No solid pixels in this column
+
+                // Find the highest solid pixel in this column of the grounded obstacle
+                let groundedTopY = -1;
+                for (let localY = 0; localY < groundObstacle.height; localY++) {
+                    if (isPixelSolid(groundObstacle.type.sprite, localX2, localY, 2)) {
+                        groundedTopY = localY;
+                        break;
+                    }
+                }
+
+                if (groundedTopY === -1) continue; // No solid pixels in this column
+
+                // Calculate where the falling obstacle should be positioned
+                // so that its bottom pixel touches the top pixel of the grounded obstacle
+                const restY = (groundObstacle.y + groundedTopY) - (fallingBottomY + 1);
+
+                if (restY < lowestRestY) {
+                    lowestRestY = restY;
+                }
             }
         }
     }
 
-    return highest;
+    return lowestRestY;
 }
 
 // Get pile density at player position
@@ -452,10 +559,16 @@ function update() {
     for (let i = obstacles.length - 1; i >= 0; i--) {
         const obstacle = obstacles[i];
 
-        // Skip updating grounded obstacles - they're handled separately
-        if (obstacle.onGround) continue;
+        // GROUNDED OBSTACLES - only update if being pushed
+        if (obstacle.onGround) {
+            // Handle pushing (dealt with later in the code)
+            continue;
+        }
 
+        // FALLING OBSTACLES
         if (!obstacle.deflected) {
+            // Normal falling behavior
+
             // Update meteor trail
             if (obstacle.type.name === 'meteor') {
                 obstacle.trail.unshift({ x: obstacle.x + obstacle.width / 2, y: obstacle.y + obstacle.height / 2 });
@@ -464,33 +577,41 @@ function update() {
                 }
             }
 
+            // Move the obstacle
             obstacle.y += obstacle.velocityY;
-            obstacle.x += obstacle.velocityX; // Apply horizontal velocity (for meteors)
+            obstacle.x += obstacle.velocityX; // For meteors
 
-            // Check collision with grounded obstacles (only if not deflected)
-            const groundCollision = checkGroundObstacleCollision(obstacle);
-            if (groundCollision) {
-                // Land on top of the grounded obstacle
-                obstacle.y = groundCollision.y - obstacle.height;
+            // Check if it should land
+            const restingY = findRestingY(obstacle);
+            const obstacleBottom = obstacle.y + obstacle.height;
+
+            if (obstacleBottom >= restingY) {
+                // Land it!
+                obstacle.y = restingY - obstacle.height;
                 obstacle.onGround = true;
                 obstacle.velocityY = 0;
                 obstacle.velocityX = 0;
-                obstacle.trail = []; // Clear trail when grounded
+                obstacle.trail = [];
 
-                // Add to appropriate pile
+                // Add to pile tracking
                 const segmentIndex = Math.floor((obstacle.x + obstacle.width / 2) / PILE_SEGMENT_WIDTH);
                 if (segmentIndex >= 0 && segmentIndex < groundPiles.length) {
-                    const pile = groundPiles[segmentIndex];
-                    pile.count++;
-                    pile.obstacles.push(obstacle);
+                    groundPiles[segmentIndex].count++;
+                    groundPiles[segmentIndex].obstacles.push(obstacle);
+
+                    // Countdown increases when NON-DEFLECTED obstacle hits ground
+                    if (!obstacle.deflected && countdown > 0) {
+                        countdown++;
+                        if (countdown > 10) countdown = 10;
+                    }
                 }
             }
         } else {
-            // Deflected obstacles ignore other obstacles
+            // DEFLECTED OBSTACLES - fly off screen with physics
             obstacle.velocityY += GRAVITY;
             obstacle.y += obstacle.velocityY;
             obstacle.x += obstacle.velocityX;
-            obstacle.trail = []; // Clear trail when deflected
+            obstacle.trail = [];
         }
 
         // Check umbrella collision when open
@@ -521,9 +642,9 @@ function update() {
             }
         }
 
-        // Check collision for learning mode (Choice B)
+        // Check collision for learning mode (Choice B) - PIXEL PERFECT
         // In meditation mode, obstacles don't give knowledge - only stillness does
-        if (choiceMade === 'learn' && secondChoiceMade !== 'meditate' && !obstacle.deflected && !obstacle.onGround && checkCollision(obstacle, player)) {
+        if (choiceMade === 'learn' && secondChoiceMade !== 'meditate' && !obstacle.deflected && !obstacle.onGround && checkPixelCollision(obstacle, player)) {
             // In learn mode, touching obstacles gives knowledge instead of game over
             knowledge = Math.min(maxKnowledge, knowledge + knowledgeGainRate);
             knowledgeText = knowledgeMessages[Math.floor(Math.random() * knowledgeMessages.length)];
@@ -533,36 +654,14 @@ function update() {
             obstacle.velocityX = (obstacle.x - player.x) / 20;
         }
 
-        // Check player collision with falling obstacles only (not grounded ones)
+        // Check player collision with falling obstacles only (not grounded ones) - PIXEL PERFECT
         // Game over in fight mode, or in meditation mode (can't learn from touching in meditation)
-        if ((choiceMade !== 'learn' || secondChoiceMade === 'meditate') && !obstacle.deflected && !obstacle.onGround && checkCollision(obstacle, player)) {
+        if ((choiceMade !== 'learn' || secondChoiceMade === 'meditate') && !obstacle.deflected && !obstacle.onGround && checkPixelCollision(obstacle, player)) {
             gameOver = true;
             if (score > highScore) {
                 highScore = score;
                 localStorage.setItem('umbrellaHighScore', highScore);
                 document.getElementById('highScore').textContent = highScore;
-            }
-        }
-
-        // Add to ground pile when obstacle hits ground level
-        if (obstacle.y + obstacle.height >= GROUND_LEVEL && !obstacle.onGround) {
-            obstacle.onGround = true;
-            obstacle.velocityY = 0;
-            obstacle.velocityX = 0;
-            obstacle.y = GROUND_LEVEL - obstacle.height; // Snap to ground properly
-            obstacle.trail = []; // Clear trail
-
-            const segmentIndex = Math.floor((obstacle.x + obstacle.width / 2) / PILE_SEGMENT_WIDTH);
-            if (segmentIndex >= 0 && segmentIndex < groundPiles.length) {
-                const pile = groundPiles[segmentIndex];
-                pile.count++;
-                pile.obstacles.push(obstacle);
-
-                // Countdown increases when NON-DEFLECTED obstacle hits ground
-                if (!obstacle.deflected && countdown > 0) {
-                    countdown++;
-                    if (countdown > 10) countdown = 10; // Cap at 10
-                }
             }
         }
 
@@ -573,33 +672,31 @@ function update() {
         }
     }
 
-    // Handle umbrella pushing grounded obstacles
+    // Handle umbrella pushing grounded obstacles - ONLY on actual pixel contact
     if (player.umbrellaOpen) {
         for (let pile of groundPiles) {
             for (let groundObstacle of pile.obstacles) {
-                if (!groundObstacle.pushing && checkCollision(player, {
-                    x: player.x - 20,
-                    y: player.y,
-                    width: player.width + 40,
-                    height: player.height
-                })) {
+                // Check for pixel-perfect collision between player and grounded obstacle
+                if (!groundObstacle.pushing && checkPixelCollision(player, groundObstacle)) {
                     // Determine push direction based on player position
                     const pushDirection = (player.x + player.width / 2) < (groundObstacle.x + groundObstacle.width / 2) ? 1 : -1;
-                    groundObstacle.pushVelocityX = pushDirection * 2;
+                    // Much smaller push force - only 0.5 pixels per frame
+                    groundObstacle.pushVelocityX = pushDirection * 0.5;
                     groundObstacle.pushing = true;
                 }
             }
         }
     }
 
-    // Update grounded obstacles physics
+    // Update grounded obstacles - ONLY handle pushing
     for (let pile of groundPiles) {
         for (let i = pile.obstacles.length - 1; i >= 0; i--) {
             const groundObstacle = pile.obstacles[i];
 
-            // Apply push velocity
+            // Apply push velocity if being pushed
             if (groundObstacle.pushVelocityX) {
                 groundObstacle.x += groundObstacle.pushVelocityX;
+
                 // Friction
                 groundObstacle.pushVelocityX *= 0.95;
                 if (Math.abs(groundObstacle.pushVelocityX) < 0.1) {
@@ -607,12 +704,10 @@ function update() {
                     groundObstacle.pushing = false;
                 }
 
-                // Check if pushed off screen
+                // Check if pushed off screen - remove it
                 if (groundObstacle.x < -groundObstacle.width || groundObstacle.x > GAME_WIDTH) {
-                    // Remove from pile
                     pile.obstacles.splice(i, 1);
                     pile.count--;
-                    // Remove from main obstacles array
                     const obstacleIndex = obstacles.indexOf(groundObstacle);
                     if (obstacleIndex !== -1) {
                         obstacles.splice(obstacleIndex, 1);
@@ -624,32 +719,10 @@ function update() {
                 const newSegmentIndex = Math.floor((groundObstacle.x + groundObstacle.width / 2) / PILE_SEGMENT_WIDTH);
                 const oldSegmentIndex = groundPiles.indexOf(pile);
                 if (newSegmentIndex !== oldSegmentIndex && newSegmentIndex >= 0 && newSegmentIndex < groundPiles.length) {
-                    // Remove from old pile
                     pile.obstacles.splice(i, 1);
                     pile.count--;
-                    // Add to new pile
                     groundPiles[newSegmentIndex].obstacles.push(groundObstacle);
                     groundPiles[newSegmentIndex].count++;
-                }
-            }
-
-            // Apply gravity to grounded obstacles to make them fall if nothing below
-            if (!groundObstacle.pushing) { // Don't apply gravity while being pushed
-                const supportY = getHighestObstacleAt(groundObstacle.x, groundObstacle.width);
-                const expectedY = supportY - groundObstacle.height;
-
-                if (groundObstacle.y < expectedY - 2) {
-                    // Something below was removed, fall down
-                    groundObstacle.y += 3; // Fall speed
-                    if (groundObstacle.y >= expectedY) {
-                        groundObstacle.y = expectedY;
-                    }
-                } else if (groundObstacle.y > expectedY + 2) {
-                    // Too low, move up (shouldn't happen but just in case)
-                    groundObstacle.y = expectedY;
-                } else {
-                    // Stable - snap to expected position
-                    groundObstacle.y = expectedY;
                 }
             }
         }
@@ -958,4 +1031,5 @@ window.addEventListener('keyup', (e) => {
 
 // Initialize
 updateScore();
+document.getElementById('version').textContent = VERSION;
 gameLoop();
