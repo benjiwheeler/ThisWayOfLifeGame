@@ -1,0 +1,27 @@
+{
+  "name": "this-way-of-life-will-last-forever",
+  "version": "1.0.0",
+  "description": "A classic Mac-style game with Victorian aesthetics",
+  "main": "src/game.js",
+  "scripts": {
+    "build": "webpack --mode production",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
+    "dev": "webpack serve --mode development --open"
+  },
+  "keywords": [
+    "game",
+    "mac",
+    "victorian",
+    "canvas"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "gh-pages": "^6.1.1",
+    "html-webpack-plugin": "^5.6.0",
+    "webpack": "^5.94.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.1.0"
+  }
+}
