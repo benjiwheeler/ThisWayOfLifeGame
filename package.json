@@ -5,6 +5,8 @@
   "main": "src/game.js",
   "scripts": {
     "build": "webpack --mode production",
+    "postbuild": "npm run copy-past-versions",
+    "copy-past-versions": "cp -R dist-past-versions dist/past-versions",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "dev": "webpack serve --mode development --open"
