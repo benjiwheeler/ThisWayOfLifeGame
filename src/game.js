@@ -1,8 +1,8 @@
 // This Way of Life Will Last Forever - Classic Mac Game
 // By Claude Code
-// Version 1.3
+// Version 2.0
 
-const VERSION = '1.3';
+const VERSION = '2.0';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -24,6 +24,7 @@ const GROUND_LEVEL = GAME_HEIGHT - PLAYER_HEIGHT - 10;
 const PILE_SEGMENT_WIDTH = 32;
 
 // Game state
+let gameState = 'title'; // 'title', 'playing', 'gameover'
 let player = {
     x: GAME_WIDTH / 2 - PLAYER_WIDTH / 2,
     y: GROUND_LEVEL,
@@ -53,6 +54,11 @@ let knowledgeTextTimer = 0;
 let knowledgeGainRate = 10; // How much knowledge per touch
 let playerSpeed = PLAYER_SPEED;
 let stillnessTimer = 0; // Tracks how long player has been still
+
+// Fight mode progression
+let fightModeTime = 0; // Frames since entering fight mode
+let obstacleSpeedMultiplier = 1.0;
+let spawnRateMultiplier = 1.0;
 
 const knowledgeMessages = [
     "they seem made from strange metallic material",
@@ -224,6 +230,110 @@ const sprites = {
         [0,0,0,1,1,1,1,1,1,0,0,0],
         [0,0,0,1,1,1,1,1,1,0,0,0],
         [0,0,0,0,1,1,1,1,0,0,0,0]
+    ],
+
+    // Title screen: Heroic Victorian lady with parasol (32x48) - dramatic pose
+    titleLady: [
+        [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,1,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+        [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+        [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+        [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+        [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+        [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0]
+    ],
+
+    // Title screen: Large parasol held up defensively (40x24)
+    titleParasol: [
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+        [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [1,1,1,0,1,1,0,1,1,0,1,1,0,1,1,1,1,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,0,1,1,1,0,0],
+        [1,1,0,0,0,1,0,0,1,0,0,1,0,0,1,1,1,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,1,0,0,1,1,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    ],
+
+    // Angry alien face (20x20)
+    angryAlien: [
+        [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+        [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+        [1,1,1,1,0,0,1,1,1,1,1,1,1,1,0,0,1,1,1,1],
+        [1,1,1,0,0,0,0,1,1,1,1,1,1,0,0,0,0,1,1,1],
+        [1,1,1,0,1,1,0,1,1,1,1,1,1,0,1,1,0,1,1,1],
+        [1,1,1,1,0,0,1,1,1,1,1,1,1,1,0,0,1,1,1,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,1,1,0,0,0,1,1,1,1,1,1,1,1,0,0,0,1,1,1],
+        [1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
+        [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
+        [0,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,0],
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+        [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+        [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0]
     ]
 };
 
@@ -278,12 +388,16 @@ const obstacleTypes = [
 // Create obstacle
 function createObstacle() {
     const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+
+    // Apply speed multiplier in fight mode
+    const baseSpeed = (OBSTACLE_SPEED + Math.random() * 1) * obstacleSpeedMultiplier;
+
     const obstacle = {
         x: Math.random() * (GAME_WIDTH - type.width * 2),
         y: -type.height * 2,
         width: type.width * 2,
         height: type.height * 2,
-        velocityY: OBSTACLE_SPEED + Math.random() * 1,
+        velocityY: baseSpeed,
         velocityX: 0,
         type: type,
         deflected: false,
@@ -294,8 +408,8 @@ function createObstacle() {
     // Meteors have diagonal movement
     if (type.name === 'meteor') {
         const angle = Math.random() * Math.PI / 3 - Math.PI / 6; // -30 to +30 degrees
-        obstacle.velocityX = Math.sin(angle) * (OBSTACLE_SPEED + 1);
-        obstacle.velocityY = Math.cos(angle) * (OBSTACLE_SPEED + 1);
+        obstacle.velocityX = Math.sin(angle) * (baseSpeed + 1);
+        obstacle.velocityY = Math.cos(angle) * (baseSpeed + 1);
 
         // Start from top or sides depending on angle
         if (obstacle.velocityX < 0) {
@@ -416,7 +530,8 @@ function getHighestSolidPixelY(sprite, scale = 2) {
 
 // Find what Y position an obstacle should rest at given its X position
 // This scans pixel-by-pixel to find exact contact point
-function findRestingY(obstacle) {
+// excludeSelf: if true, don't consider the obstacle itself when checking grounded obstacles
+function findRestingY(obstacle, excludeSelf = false) {
     if (obstacle.deflected) return null; // Deflected obstacles don't stack
 
     let lowestRestY = GROUND_LEVEL;
@@ -424,6 +539,9 @@ function findRestingY(obstacle) {
     // Check all grounded obstacles
     for (let pile of groundPiles) {
         for (let groundObstacle of pile.obstacles) {
+            // Skip if checking self
+            if (excludeSelf && groundObstacle === obstacle) continue;
+
             // Quick bounding box check first
             const xOverlap = obstacle.x < groundObstacle.x + groundObstacle.width &&
                            obstacle.x + obstacle.width > groundObstacle.x;
@@ -486,6 +604,7 @@ function getPileDensityAtPosition(x) {
 
 // Update game
 function update() {
+    if (gameState === 'title') return; // Don't update during title screen
     if (gameOver) return;
     if (showingChoice) return; // Pause game during choice
 
@@ -500,6 +619,17 @@ function update() {
     // Check if knowledge meter is full and trigger second choice
     if (choiceMade === 'learn' && !secondChoiceMade && knowledge >= maxKnowledge) {
         showingChoice = true;
+    }
+
+    // Fight mode progression - obstacles get faster and more frequent
+    if (choiceMade === 'fight') {
+        fightModeTime++;
+
+        // Speed increases slowly over time (caps at 2.5x after ~1 minute)
+        obstacleSpeedMultiplier = Math.min(2.5, 1.0 + (fightModeTime / 3600));
+
+        // Spawn rate increases (caps at 3x after ~1 minute)
+        spawnRateMultiplier = Math.min(3.0, 1.0 + (fightModeTime / 3600));
     }
 
     // Calculate speed modifier based on ground pile density
@@ -523,8 +653,8 @@ function update() {
     if (secondChoiceMade === 'meditate') {
         if (!playerMoved && !player.umbrellaOpen) {
             stillnessTimer++;
-            // Gain knowledge every 60 frames (1 second) of stillness
-            if (stillnessTimer >= 60) {
+            // Gain knowledge every 15 frames (0.25 seconds) of stillness - 4x faster!
+            if (stillnessTimer >= 15) {
                 knowledge = Math.min(maxKnowledge, knowledge + 1);
                 stillnessTimer = 0;
             }
@@ -581,13 +711,14 @@ function update() {
             obstacle.y += obstacle.velocityY;
             obstacle.x += obstacle.velocityX; // For meteors
 
-            // Check if it should land
+            // Check if it should land - only when pixels would actually touch
             const restingY = findRestingY(obstacle);
-            const obstacleBottom = obstacle.y + obstacle.height;
 
-            if (obstacleBottom >= restingY) {
-                // Land it!
-                obstacle.y = restingY - obstacle.height;
+            // Only land when current position passes the resting position
+            // This prevents "jumping" into place from a distance
+            if (obstacle.y >= restingY) {
+                // Land it! restingY is already the correct Y position
+                obstacle.y = restingY;
                 obstacle.onGround = true;
                 obstacle.velocityY = 0;
                 obstacle.velocityX = 0;
@@ -642,16 +773,28 @@ function update() {
             }
         }
 
-        // Check collision for learning mode (Choice B) - PIXEL PERFECT
+        // Check collision for learning mode (Choice B) - EXPANDED CONTACT AREA
         // In meditation mode, obstacles don't give knowledge - only stillness does
-        if (choiceMade === 'learn' && secondChoiceMade !== 'meditate' && !obstacle.deflected && !obstacle.onGround && checkPixelCollision(obstacle, player)) {
-            // In learn mode, touching obstacles gives knowledge instead of game over
-            knowledge = Math.min(maxKnowledge, knowledge + knowledgeGainRate);
-            knowledgeText = knowledgeMessages[Math.floor(Math.random() * knowledgeMessages.length)];
-            knowledgeTextTimer = 120; // 2 seconds at 60fps
-            obstacle.deflected = true;
-            obstacle.velocityY = -2; // Gentle push away
-            obstacle.velocityX = (obstacle.x - player.x) / 20;
+        if (choiceMade === 'learn' && secondChoiceMade !== 'meditate' && !obstacle.deflected && !obstacle.onGround) {
+            // Create an expanded learning contact area around the player
+            const learningArea = {
+                x: player.x - 8,
+                y: player.y - 8,
+                width: player.width + 16,
+                height: player.height + 16,
+                type: { sprite: sprites.woman }
+            };
+
+            // Check if obstacle is in the expanded learning area
+            if (checkCollision(obstacle, learningArea)) {
+                // In learn mode, touching obstacles gives knowledge instead of game over
+                knowledge = Math.min(maxKnowledge, knowledge + knowledgeGainRate);
+                knowledgeText = knowledgeMessages[Math.floor(Math.random() * knowledgeMessages.length)];
+                knowledgeTextTimer = 120; // 2 seconds at 60fps
+                obstacle.deflected = true;
+                obstacle.velocityY = -2; // Gentle push away
+                obstacle.velocityX = (obstacle.x - player.x) / 20;
+            }
         }
 
         // Check player collision with falling obstacles only (not grounded ones) - PIXEL PERFECT
@@ -672,37 +815,118 @@ function update() {
         }
     }
 
-    // Handle umbrella pushing grounded obstacles - ONLY on actual pixel contact
+    // Handle umbrella destroying grounded obstacles - ONLY on actual pixel contact
     if (player.umbrellaOpen) {
+        const umbrellaSize = choiceMade === 'fight' ? 72 : 48; // Larger in fight mode
+        const umbrellaScale = choiceMade === 'fight' ? 3 : 2;
+        const umbrellaOffset = choiceMade === 'fight' ? -16 : -8;
+        const umbrellaBox = {
+            x: player.x + umbrellaOffset,
+            y: player.y - 32,
+            width: umbrellaSize,
+            height: 32,
+            type: { sprite: sprites.umbrellaOpen }
+        };
+
         for (let pile of groundPiles) {
-            for (let groundObstacle of pile.obstacles) {
-                // Check for pixel-perfect collision between player and grounded obstacle
-                if (!groundObstacle.pushing && checkPixelCollision(player, groundObstacle)) {
-                    // Determine push direction based on player position
-                    const pushDirection = (player.x + player.width / 2) < (groundObstacle.x + groundObstacle.width / 2) ? 1 : -1;
-                    // Much smaller push force - only 0.5 pixels per frame
-                    groundObstacle.pushVelocityX = pushDirection * 0.5;
-                    groundObstacle.pushing = true;
+            for (let i = pile.obstacles.length - 1; i >= 0; i--) {
+                const groundObstacle = pile.obstacles[i];
+
+                // Check for pixel-perfect collision between umbrella and grounded obstacle
+                if (!groundObstacle.deflected && !groundObstacle.falling && checkPixelCollision(umbrellaBox, groundObstacle, umbrellaScale, 2)) {
+                    // Deflect the grounded obstacle!
+                    groundObstacle.deflected = true;
+                    groundObstacle.onGround = false;
+                    groundObstacle.velocityY = -UMBRELLA_PUSH_FORCE;
+                    groundObstacle.velocityX = (groundObstacle.x - player.x) / 10;
+
+                    // Remove from pile
+                    pile.obstacles.splice(i, 1);
+                    pile.count--;
+
+                    score += 5; // Less points for clearing grounded obstacles
+                    updateScore();
+
+                    // Countdown decreases when clearing obstacles
+                    if (countdown > 0) {
+                        countdown--;
+                        if (countdown === 0 && !choiceMade) {
+                            showingChoice = true;
+                        }
+                    }
                 }
             }
         }
     }
 
-    // Update grounded obstacles - ONLY handle pushing
+    // Check if any grounded obstacles have lost support and should fall
+    for (let pile of groundPiles) {
+        for (let groundObstacle of pile.obstacles) {
+            if (!groundObstacle.falling && !groundObstacle.deflected) {
+                // Calculate where this obstacle should rest (exclude self from calculation)
+                const expectedRestY = findRestingY(groundObstacle, true);
+
+                // If current position is higher than where it should rest, it needs to fall
+                if (groundObstacle.y < expectedRestY - 2) {
+                    groundObstacle.falling = true;
+                    groundObstacle.fallVelocityY = 0;
+                }
+            }
+        }
+    }
+
+    // Update falling grounded obstacles
+    for (let pile of groundPiles) {
+        for (let groundObstacle of pile.obstacles) {
+            if (groundObstacle.falling) {
+                // Apply gravity
+                groundObstacle.fallVelocityY += GRAVITY;
+                groundObstacle.y += groundObstacle.fallVelocityY;
+
+                // Check if it should land (exclude self from calculation)
+                const restingY = findRestingY(groundObstacle, true);
+
+                if (groundObstacle.y >= restingY) {
+                    // Land it
+                    groundObstacle.y = restingY;
+                    groundObstacle.falling = false;
+                    groundObstacle.fallVelocityY = 0;
+                }
+            }
+        }
+    }
+
+    // Push grounded obstacles when player walks into them
+    for (let pile of groundPiles) {
+        for (let groundObstacle of pile.obstacles) {
+            if (!groundObstacle.deflected && !groundObstacle.falling) {
+                // Check for pixel-perfect collision between player and grounded obstacle
+                if (checkPixelCollision(player, groundObstacle)) {
+                    // Determine push direction based on player position
+                    const pushDirection = (player.x + player.width / 2) < (groundObstacle.x + groundObstacle.width / 2) ? 1 : -1;
+
+                    // Push the obstacle horizontally
+                    if (!groundObstacle.pushVelocityX) {
+                        groundObstacle.pushVelocityX = 0;
+                    }
+                    groundObstacle.pushVelocityX += pushDirection * 0.3;
+                    // Cap push velocity
+                    groundObstacle.pushVelocityX = Math.max(-2, Math.min(2, groundObstacle.pushVelocityX));
+                }
+            }
+        }
+    }
+
+    // Apply push velocity and friction to grounded obstacles
     for (let pile of groundPiles) {
         for (let i = pile.obstacles.length - 1; i >= 0; i--) {
             const groundObstacle = pile.obstacles[i];
 
-            // Apply push velocity if being pushed
-            if (groundObstacle.pushVelocityX) {
+            if (groundObstacle.pushVelocityX && Math.abs(groundObstacle.pushVelocityX) > 0.01) {
                 groundObstacle.x += groundObstacle.pushVelocityX;
 
                 // Friction
-                groundObstacle.pushVelocityX *= 0.95;
-                if (Math.abs(groundObstacle.pushVelocityX) < 0.1) {
-                    groundObstacle.pushVelocityX = 0;
-                    groundObstacle.pushing = false;
-                }
+                groundObstacle.pushVelocityX *= 0.9;
 
                 // Check if pushed off screen - remove it
                 if (groundObstacle.x < -groundObstacle.width || groundObstacle.x > GAME_WIDTH) {
@@ -728,8 +952,11 @@ function update() {
         }
     }
 
-    // Spawn new obstacles
-    if (Math.random() < 0.02) {
+
+    // Spawn new obstacles - rate increases in fight mode
+    const baseSpawnRate = 0.02;
+    const spawnRate = baseSpawnRate * spawnRateMultiplier;
+    if (Math.random() < spawnRate) {
         obstacles.push(createObstacle());
     }
 
@@ -886,8 +1113,61 @@ function drawGroundPiles() {
     });
 }
 
+// Draw title screen with dramatic Mega Man-style composition
+function drawTitleScreen() {
+    // Clear screen with white background
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    // Draw title at top
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 20px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('THIS WAY OF LIFE', GAME_WIDTH / 2, 40);
+    ctx.fillText('WILL LAST FOREVER', GAME_WIDTH / 2, 65);
+
+    // Draw heroic Victorian lady in center with parasol (Mega Man pose)
+    const ladyX = GAME_WIDTH / 2 - 32;
+    const ladyY = 140;
+    drawSprite(sprites.titleLady, ladyX, ladyY, 2);
+
+    // Draw large parasol held up defensively above her
+    const parasolX = ladyX - 8;
+    const parasolY = ladyY - 20;
+    drawSprite(sprites.titleParasol, parasolX, parasolY, 2);
+
+    // Draw angry alien objects falling around her (dramatic surrounding enemies)
+    // Top left
+    drawSprite(sprites.angryAlien, 50, 80, 2);
+    // Top right
+    drawSprite(sprites.angryAlien, GAME_WIDTH - 90, 100, 2);
+    // Middle left
+    drawSprite(sprites.angryAlien, 30, 180, 2);
+    // Middle right
+    drawSprite(sprites.angryAlien, GAME_WIDTH - 70, 200, 2);
+    // Lower left
+    drawSprite(sprites.angryAlien, 80, 280, 2);
+    // Lower right
+    drawSprite(sprites.angryAlien, GAME_WIDTH - 110, 260, 2);
+
+    // Draw instruction text at bottom
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('PRESS SPACE TO START', GAME_WIDTH / 2, GAME_HEIGHT - 40);
+
+    // Draw border
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+}
+
 // Draw game
 function draw() {
+    // Show title screen if in title state
+    if (gameState === 'title') {
+        drawTitleScreen();
+        return;
+    }
+
     // Clear screen with white
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
@@ -951,6 +1231,7 @@ function updateScore() {
 
 // Reset game
 function resetGame() {
+    gameState = 'title'; // Go back to title screen
     player.x = GAME_WIDTH / 2 - PLAYER_WIDTH / 2;
     player.y = GROUND_LEVEL;
     player.umbrellaOpen = false;
@@ -969,12 +1250,22 @@ function resetGame() {
     knowledgeGainRate = 10;
     playerSpeed = PLAYER_SPEED;
     stillnessTimer = 0;
+    fightModeTime = 0;
+    obstacleSpeedMultiplier = 1.0;
+    spawnRateMultiplier = 1.0;
     updateScore();
 }
 
 // Keyboard controls
 window.addEventListener('keydown', (e) => {
     keys[e.key] = true;
+
+    // Start game from title screen
+    if (e.key === ' ' && gameState === 'title') {
+        gameState = 'playing';
+        e.preventDefault();
+        return;
+    }
 
     if (e.key === ' ' && gameOver) {
         resetGame();
