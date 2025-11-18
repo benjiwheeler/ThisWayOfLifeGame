@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>This Way of Life Will Last Forever - Classic Mac Game</title><style>body {
+            margin: 0;
+            padding: 20px;
+            background: #c0c0c0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: "Chicago", "Courier New", monospace;
+        }
+
+        #gameContainer {
+            border: 2px solid #000;
+            box-shadow: 4px 4px 0 #808080;
+            background: #fff;
+        }
+
+        #gameCanvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #info {
+            margin-top: 20px;
+            padding: 10px;
+            background: #fff;
+            border: 2px solid #000;
+            text-align: center;
+            max-width: 512px;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+
+        p {
+            margin: 5px 0;
+            font-size: 12px;
+        }</style><script defer="defer" src="bundle.js"></script></head><body><div id="gameContainer"><canvas id="gameCanvas" width="512" height="384"></canvas></div><div id="info"><h1>☂ This Way of Life Will Last Forever ☂</h1><p>← → to move | ↑ to open umbrella and deflect</p><p>Score: <span id="score">0</span> | High Score: <span id="highScore">0</span></p></div></body></html>
